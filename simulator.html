@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeerNilai | ESP32 Telemetry Simulator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <header class="app-header">
+        <div class="container py-3">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="brand-mark"><i class="bi bi-water"></i></div>
+                    <div>
+                        <p class="brand-title">NEERNILAI</p>
+                        <p class="brand-sub mb-0">Smart Reservoir Monitoring System</p>
+                    </div>
+                </div>
+                <p class="tagline mb-0">Real-Time ESP32 Monitoring &amp; Administrative Control</p>
+                <nav class="d-flex flex-wrap gap-1" aria-label="Main">
+                    <a class="nav-link" href="index.html">Dashboard</a>
+                    <a class="nav-link" href="admin.html">Admin Control</a>
+                    <a class="nav-link active" href="simulator.html">Simulator</a>
+                    <a class="nav-link" href="index.html#system-status">System Status</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="container page-wrap">
+        <div class="mb-3">
+            <h1 class="hmi-title h3 mb-1">ESP32 Reservoir Telemetry Simulator</h1>
+            <p class="text-muted mb-0">This page stands in for the future ESP32. It writes live data to Firebase Realtime Database using the same schema the hardware will use.</p>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-lg-5">
+                <section class="glass-card">
+                    <div class="section-label"><i class="bi bi-cpu"></i> Simulator Controls</div>
+                    <div class="mb-3">
+                        <div class="metric-name">Device ID</div>
+                        <div id="simDevice" class="fw-semibold">ESP32_RESERVOIR_01</div>
+                    </div>
+                    <div class="d-flex justify-content-between mb-3">
+                        <div>
+                            <div class="metric-name">Connection status</div>
+                            <div id="simRunState" class="status-pill pill-off">STOPPED</div>
+                        </div>
+                        <div class="text-end">
+                            <div class="metric-name">Simulation interval</div>
+                            <div id="simIntervalLabel">2 s</div>
+                        </div>
+                    </div>
+                    <label class="small text-muted" for="simInterval">Interval</label>
+                    <select id="simInterval" class="step-select d-block mb-3 w-100">
+                        <option value="1000">1 second</option>
+                        <option value="2000" selected>2 seconds</option>
+                        <option value="5000">5 seconds</option>
+                        <option value="10000">10 seconds</option>
+                    </select>
+                    <div class="control-actions">
+                        <button id="startSim" class="btn btn-teal btn-nn">START SIMULATOR</button>
+                        <button id="stopSim" class="btn btn-danger-nn btn-nn">STOP SIMULATOR</button>
+                    </div>
+                    <p class="small text-muted mt-3 mb-0">Last Firebase write: <span id="simLastWrite">—</span></p>
+                    <p id="simError" class="text-danger small mt-2 mb-0"></p>
+                </section>
+            </div>
+            <div class="col-lg-7">
+                <section class="glass-card sim-preview">
+                    <div class="section-label"><i class="bi bi-activity"></i> Live Simulated Telemetry</div>
+                    <div class="kv"><span>Water level</span><strong id="prevLevel">—</strong></div>
+                    <div class="kv"><span>Water percentage</span><strong id="prevPercent">—</strong></div>
+                    <div class="kv"><span>Storage</span><strong id="prevStorage">—</strong></div>
+                    <div class="kv"><span>Inflow</span><strong id="prevInflow">—</strong></div>
+                    <div class="kv"><span>Outflow</span><strong id="prevOutflow">—</strong></div>
+                    <div class="kv"><span>Gate position</span><strong id="prevGate">—</strong></div>
+                    <div class="kv"><span>Pump</span><strong id="prevPump">—</strong></div>
+                    <div class="kv"><span>Solenoid</span><strong id="prevSolenoid">—</strong></div>
+                    <p class="small text-muted mt-3 mb-0">Physics follow admin commands: pump raises inflow, gate/solenoid raise outflow, and water level integrates the net flow.</p>
+                </section>
+            </div>
+        </div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="js/simulator.js"></script>
+</body>
+</html>
