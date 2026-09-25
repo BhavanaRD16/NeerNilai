@@ -1,0 +1,4 @@
+NeerNilai assets folder.
+
+CSS-based reservoir visualization is used on the dashboard (no external tank image).
+Place project logos or field photographs here later if needed.

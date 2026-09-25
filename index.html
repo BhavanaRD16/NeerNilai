@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeerNilai | Reservoir Monitoring Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+    <header class="app-header">
+        <div class="container py-3">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <a href="index.html" class="d-flex align-items-center gap-3 text-decoration-none">
+                    <div class="brand-mark"><i class="bi bi-water"></i></div>
+                    <div>
+                        <p class="brand-title text-white">NEERNILAI</p>
+                        <p class="brand-sub mb-0">Smart Reservoir Monitoring System</p>
+                    </div>
+                </a>
+                <p class="tagline mb-0 d-none d-lg-block">Real-Time ESP32 Monitoring &amp; Administrative Control</p>
+                <nav class="d-flex flex-wrap gap-1 align-items-center" aria-label="Main">
+                    <a class="nav-link" href="admin.html">Admin Control</a>
+                    <a class="nav-link" href="simulator.html">Simulator</a>
+                    <!-- Auth bar injected here by authUi.js -->
+                    <div id="nnAuthHeaderContainer" class="d-flex flex-wrap align-items-center gap-2 ms-2">
+                        <button type="button" class="btn btn-teal btn-sm btn-auth-action" id="btnHeaderLogin" style="opacity:0;pointer-events:none">
+                            <i class="bi bi-shield-lock-fill"></i> Login
+                        </button>
+                    </div>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="container page-wrap">
+
+        <!-- === AUTHORIZED USERS ONLY: Full technical status === -->
+        <div id="nnTechStatusPanel" class="d-none">
+            <div id="firebaseErrorBanner" class="firebase-banner mb-3 d-none">
+                <strong>Firebase Connection Error</strong>
+                <span class="ms-2">The dashboard cannot reach Realtime Database. Check rules, network, and project config.</span>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-lg-4">
+                    <section class="glass-card">
+                        <div class="section-label"><i class="bi bi-broadcast"></i> Connection Status</div>
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="metric-name">ESP32 Status</div>
+                                <div id="esp32Status" class="device-state is-offline">OFFLINE</div>
+                                <div id="deviceId" class="mt-3 fw-semibold">ESP32_RESERVOIR_01</div>
+                                <div class="text-muted small">Last update: <span id="lastUpdate">No telemetry yet</span></div>
+                                <div class="text-muted small" id="lastUpdateExact">Waiting for data</div>
+                            </div>
+                            <div class="text-end">
+                                <div class="metric-name">Firebase</div>
+                                <div id="firebaseStatus" class="status-pill pill-off">ERROR</div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+                <div class="col-lg-8">
+                    <section class="glass-card">
+                        <div class="section-label"><i class="bi bi-exclamation-diamond"></i> Alert Section</div>
+                        <div id="alertSection"></div>
+                    </section>
+                </div>
+            </div>
+        </div>
+
+        <!-- === GENERAL PUBLIC: Clean last-updated info card + public alert section === -->
+        <div id="nnPublicStatusPanel">
+            <div class="row g-3">
+                <div class="col-lg-4">
+                    <section class="glass-card">
+                        <div class="section-label"><i class="bi bi-clock"></i> Data Last Updated</div>
+                        <div id="publicLastUpdateDisplay" class="metric-value" style="font-size:1.3rem">—</div>
+                        <div class="text-muted small mt-1" id="publicLastUpdateRelative">Waiting for data…</div>
+                    </section>
+                </div>
+                <div class="col-lg-8">
+                    <section class="glass-card">
+                        <div class="section-label"><i class="bi bi-water"></i> Reservoir Status</div>
+                        <div id="publicAlertSection"></div>
+                    </section>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mt-1 metric-grid">
+            <div class="col-6 col-xl-2">
+                <article class="glass-card">
+                    <div class="metric-name">Water Level</div>
+                    <div id="metricLevel" class="metric-value">—</div>
+                </article>
+            </div>
+            <div class="col-6 col-xl-2">
+                <article class="glass-card">
+                    <div class="metric-name">Reservoir Capacity</div>
+                    <div id="metricPercent" class="metric-value">—</div>
+                </article>
+            </div>
+            <div class="col-6 col-xl-2">
+                <article class="glass-card">
+                    <div class="metric-name">Current Storage</div>
+                    <div id="metricStorage" class="metric-value">—</div>
+                </article>
+            </div>
+            <div class="col-6 col-xl-2">
+                <article class="glass-card">
+                    <div class="metric-name">Inflow</div>
+                    <div id="metricInflow" class="metric-value">—</div>
+                </article>
+            </div>
+            <div class="col-6 col-xl-2">
+                <article class="glass-card">
+                    <div class="metric-name">Outflow</div>
+                    <div id="metricOutflow" class="metric-value">—</div>
+                </article>
+            </div>
+            <div class="col-6 col-xl-2">
+                <article class="glass-card">
+                    <div class="metric-name">Gate Position</div>
+                    <div id="metricGate" class="metric-value">—</div>
+                </article>
+            </div>
+        </div>
+
+        <div class="row g-3 mt-1">
+            <div class="col-lg-4">
+                <section class="glass-card tank-panel">
+                    <div class="section-label"><i class="bi bi-droplet-half"></i> Visual Reservoir</div>
+                    <div class="tank-frame">
+                        <div class="tank-scale">
+                            <span>100%</span><span>75%</span><span>50%</span><span>25%</span><span>0%</span>
+                        </div>
+                        <div class="tank">
+                            <div id="tankWater" class="tank-water"></div>
+                            <div id="tankReadout" class="tank-readout">
+                                <strong>— cm</strong>
+                                <span>—</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+            <div class="col-lg-8">
+                <section class="glass-card">
+                    <div class="section-label"><i class="bi bi-graph-up"></i> Real-Time Analytics</div>
+                    <div class="chart-box mb-4">
+                        <canvas id="chartMulti"></canvas>
+                    </div>
+                    <div class="section-label"><i class="bi bi-bar-chart"></i> Water Storage</div>
+                    <div class="chart-box">
+                        <canvas id="chartStorage"></canvas>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <div class="row g-3 mt-1">
+            <div class="col-lg-6">
+                <section class="glass-card">
+                    <div class="section-label"><i class="bi bi-sliders"></i> System Settings Summary</div>
+                    <div class="settings-item d-flex justify-content-between"><span>Maximum Tank Height</span><strong id="setMaxHeight">15.0 cm</strong></div>
+                    <div class="settings-item d-flex justify-content-between"><span>Maximum Capacity</span><strong id="setMaxCapacity">50.0 L</strong></div>
+                    <div class="settings-item d-flex justify-content-between"><span>Warning Level</span><strong id="setWarning">12.0 cm</strong></div>
+                    <div class="settings-item d-flex justify-content-between"><span>Critical Level</span><strong id="setCritical">13.5 cm</strong></div>
+                    <div class="settings-item d-flex justify-content-between"><span>Overflow Safety</span><strong id="setOverflow">ENABLED</strong></div>
+                </section>
+            </div>
+            <div class="col-lg-6">
+                <section class="glass-card">
+                    <div class="section-label"><i class="bi bi-info-circle"></i> Data Path</div>
+                    <p class="mb-2 small text-muted">Sensors → ESP32 → Wi-Fi → Firebase Realtime Database → NeerNilai Dashboard</p>
+                    <p class="mb-0 small">Until hardware is ready, use <a href="simulator.html">simulator.html</a> to write live telemetry to the same Firebase paths.</p>
+                </section>
+            </div>
+        </div>
+
+        <section class="glass-card mt-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <div class="section-label mb-0"><i class="bi bi-clock-history"></i> Historical Data</div>
+                <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <span id="historyCount" class="small text-muted">0 records</span>
+                    <div class="btn-group">
+                        <button class="btn btn-navy btn-sm range-btn active" data-range="1">Last 1 hour</button>
+                        <button class="btn btn-navy btn-sm range-btn" data-range="3">Last 3 hours</button>
+                        <button class="btn btn-navy btn-sm range-btn" data-range="6">Last 6 hours</button>
+                        <button class="btn btn-navy btn-sm range-btn" data-range="24">Last 24 hours</button>
+                    </div>
+                    <button id="downloadCsv" class="btn btn-teal btn-sm btn-nn">Download CSV</button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-nn table-striped table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Water Level</th>
+                            <th>Water %</th>
+                            <th>Storage</th>
+                            <th>Inflow</th>
+                            <th>Outflow</th>
+                            <th>Gate Position</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyBody"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module" src="js/dashboard.js"></script>
+</body>
+</html>
