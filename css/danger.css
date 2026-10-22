@@ -1,0 +1,118 @@
+/* ==========================================================================
+   DANGER TAKEOVER & LOCKDOWN OVERLAY STYLES
+   ========================================================================== */
+
+.danger-flash-screen {
+    position: fixed;
+    inset: 0;
+    background: #ffffff;
+    z-index: 99999;
+    pointer-events: none;
+    mix-blend-mode: overlay;
+}
+
+.danger-lockdown-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9000;
+    background: radial-gradient(circle at center, rgba(30, 4, 8, 0.94) 0%, rgba(10, 1, 2, 0.98) 100%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    overflow: hidden;
+}
+
+.danger-lockdown-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+/* Hazard Stripes Top & Bottom */
+.hazard-stripe-bar {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 14px;
+    z-index: 10;
+    background: repeating-linear-gradient(
+        -45deg,
+        #dc2626,
+        #dc2626 18px,
+        #170204 18px,
+        #170204 36px
+    );
+    box-shadow: 0 0 15px rgba(220, 38, 38, 0.8);
+}
+.hazard-top { top: 0; }
+.hazard-bottom { bottom: 0; }
+
+/* Rotating Beacon Sweep Light */
+.siren-beacon-sweep {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 250vmax;
+    height: 250vmax;
+    margin-top: -125vmax;
+    margin-left: -125vmax;
+    pointer-events: none;
+    background: conic-gradient(
+        from 0deg,
+        transparent 0deg,
+        rgba(239, 68, 68, 0.18) 45deg,
+        transparent 90deg,
+        transparent 360deg
+    );
+    z-index: 1;
+}
+
+/* Glitch Typography */
+.glitch-text {
+    position: relative;
+    text-shadow: 0 0 25px rgba(239, 68, 68, 0.7);
+    animation: textGlitch 3s infinite;
+}
+
+@keyframes textGlitch {
+    0%, 88%, 100% { transform: none; filter: none; }
+    89% { transform: translate(-2px, 1px); filter: drop-shadow(2px 0 #00e5ff); }
+    91% { transform: translate(3px, -1px); filter: drop-shadow(-2px 0 #ef4444); }
+    93% { transform: translate(-1px, 2px); }
+    95% { transform: none; }
+}
+
+/* Auto-Safety Step Cards */
+.auto-safety-panel {
+    background: rgba(20, 3, 6, 0.75);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    border-radius: var(--radius-md, 14px);
+    box-shadow: 0 0 30px rgba(220, 38, 38, 0.25);
+    backdrop-filter: blur(12px);
+}
+
+.spin {
+    animation: spinIcon 1s linear infinite;
+}
+
+@keyframes spinIcon {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.btn-ack-pulse {
+    animation: ackPulse 1.8s infinite;
+}
+
+@keyframes ackPulse {
+    0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+    70% { box-shadow: 0 0 0 22px rgba(239, 68, 68, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+/* Reduced Motion Safety */
+@media (prefers-reduced-motion: reduce) {
+    .danger-flash-screen { display: none !important; }
+    .glitch-text { animation: none !important; }
+    .siren-beacon-sweep { display: none !important; }
+    .btn-ack-pulse { animation: none !important; }
+}

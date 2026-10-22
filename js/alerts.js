@@ -8,6 +8,8 @@ import {
     ref,
     set,
     update,
+    SUB,
+    damPath,
     PATHS
 } from "./firebase.js";
 import { toNumber, clamp } from "./utils.js";
@@ -154,9 +156,21 @@ function iconFor(severity) {
  * Persist the current alert snapshot and, if needed, send a gate-open command.
  * Command Sent ≠ physical gate confirmed.
  */
-export async function publishAlertsAndOverflow(alerts, settings, telemetry, controls) {
+/**
+ * Persist the current alert snapshot and, if needed, send a gate-open command.
+ * Command Sent ≠ physical gate confirmed.
+ * @param {Array} alerts
+ * @param {Object} settings
+ * @param {Object} telemetry
+ * @param {Object} controls
+ * @param {string} [damId="mettur"]
+ */
+export async function publishAlertsAndOverflow(alerts, settings, telemetry, controls, damId = "mettur") {
     try {
-        await set(ref(db, PATHS.alerts), {
+        const alertsPath = damId ? damPath(damId, SUB.alerts) : PATHS.alerts;
+        const gatePath = damId ? damPath(damId, "controls/gate") : "controls/gate";
+
+        await set(ref(db, alertsPath), {
             updatedAt: Date.now(),
             items: alerts
         });
@@ -172,7 +186,7 @@ export async function publishAlertsAndOverflow(alerts, settings, telemetry, cont
             if (commandId - lastOverflowCommandId > 8000) {
                 lastOverflowCommandId = commandId;
                 const currentPos = toNumber(controls?.gate?.position, 0);
-                await update(ref(db, "controls/gate"), {
+                await update(ref(db, gatePath), {
                     command: "OPEN_FULL",
                     step: toNumber(controls?.gate?.step, 0.25),
                     position: clamp(currentPos, 0, 1),

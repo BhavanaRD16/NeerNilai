@@ -1,0 +1,265 @@
+/* ==========================================================================
+   NEERNILAI CINEMATIC DESIGN SYSTEM & TOKENS
+   Atmospheric, deep-ocean cybernetic UI with emergency breach palette.
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Noto+Sans+Tamil:wght@400;600;700;800&family=Sora:wght@400;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
+
+:root {
+    /* --- Typography --- */
+    --font-display: 'Sora', 'Space Grotesk', -apple-system, sans-serif;
+    --font-body: 'IBM Plex Sans', -apple-system, sans-serif;
+    --font-tamil: 'Noto Sans Tamil', 'Sora', sans-serif;
+    --font-mono: 'SF Mono', 'Fira Code', 'Courier New', monospace;
+
+    /* --- Base Ocean Palette (Nominal State) --- */
+    --bg-primary: #050b14;
+    --bg-secondary: #091322;
+    --bg-surface: rgba(13, 27, 46, 0.65);
+    --bg-surface-elevated: rgba(18, 36, 62, 0.75);
+    --bg-glass: rgba(10, 24, 44, 0.55);
+    --bg-glass-card: rgba(12, 28, 52, 0.45);
+    
+    --border-subtle: rgba(56, 189, 248, 0.12);
+    --border-glow: rgba(56, 189, 248, 0.35);
+    --border-accent: rgba(0, 229, 255, 0.45);
+
+    --text-primary: #f0f6fc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --text-glow: rgba(56, 189, 248, 0.6);
+
+    /* --- Accent Accords --- */
+    --accent-cyan: #00e5ff;
+    --accent-teal: #14b8a6;
+    --accent-blue: #0284c7;
+    --accent-amber: #f59e0b;
+    --accent-danger: #ef4444;
+    --accent-blood: #dc2626;
+
+    /* --- Water Simulation Hues --- */
+    --water-cyan-top: rgba(0, 229, 255, 0.85);
+    --water-cyan-mid: rgba(2, 132, 199, 0.9);
+    --water-cyan-deep: rgba(3, 73, 115, 0.95);
+    --water-caustic: rgba(255, 255, 255, 0.4);
+
+    /* --- Dynamic Overlays & Effects --- */
+    --vignette-color: rgba(2, 6, 12, 0.7);
+    --scanline-opacity: 0.04;
+    --scene-filter: none;
+    --chromatic-shift: 0px;
+
+    /* --- Radii & Elevations --- */
+    --radius-sm: 8px;
+    --radius-md: 14px;
+    --radius-lg: 20px;
+    --radius-full: 9999px;
+
+    --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+    --shadow-cyan-glow: 0 0 25px rgba(0, 229, 255, 0.2);
+    --shadow-danger-glow: 0 0 40px rgba(220, 38, 38, 0.4);
+
+    /* --- Motion Easing Curves (Cinematic) --- */
+    --ease-cinematic: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-out-expo: cubic-bezier(0.19, 1, 0.22, 1);
+    --ease-in-out-smooth: cubic-bezier(0.65, 0, 0.35, 1);
+    --duration-fast: 200ms;
+    --duration-normal: 400ms;
+    --duration-scene: 1200ms;
+}
+
+/* ==========================================================================
+   RED DANGER THEME OVERRIDES (Triggered on Breach/Lockdown)
+   ========================================================================== */
+body.theme-danger {
+    --bg-primary: #120305;
+    --bg-secondary: #1f0609;
+    --bg-surface: rgba(45, 10, 16, 0.75);
+    --bg-surface-elevated: rgba(65, 12, 22, 0.85);
+    --bg-glass: rgba(40, 8, 14, 0.65);
+    --bg-glass-card: rgba(50, 10, 18, 0.55);
+
+    --border-subtle: rgba(239, 68, 68, 0.25);
+    --border-glow: rgba(239, 68, 68, 0.6);
+    --border-accent: rgba(255, 45, 85, 0.85);
+
+    --text-primary: #fff1f2;
+    --text-secondary: #fca5a5;
+    --text-muted: #e11d48;
+    --text-glow: rgba(239, 68, 68, 0.85);
+
+    --accent-cyan: #ff2a5f;
+    --accent-teal: #f43f5e;
+    --accent-blue: #dc2626;
+
+    --water-cyan-top: rgba(255, 45, 85, 0.9);
+    --water-cyan-mid: rgba(220, 38, 38, 0.92);
+    --water-cyan-deep: rgba(127, 29, 29, 0.98);
+
+    --vignette-color: rgba(40, 5, 8, 0.85);
+    --scanline-opacity: 0.08;
+    --shadow-cyan-glow: var(--shadow-danger-glow);
+}
+
+/* Base Body Environment */
+body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+    transition: background-color var(--duration-scene) var(--ease-cinematic),
+                color var(--duration-normal) ease;
+}
+
+/* Ambient Scanlines & Vignette */
+.cinematic-vignette {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+    background: radial-gradient(circle at center, transparent 40%, var(--vignette-color) 100%);
+    transition: background var(--duration-scene) var(--ease-cinematic);
+}
+
+.cinematic-scanlines {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 11;
+    background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, var(--scanline-opacity)) 0px,
+        rgba(0, 0, 0, var(--scanline-opacity)) 1px,
+        transparent 1px,
+        transparent 3px
+    );
+}
+
+/* Ambient Full-Viewport Water Fill Layer */
+.ambient-water-backdrop {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 50%; /* driven dynamically by waterPercentage */
+    pointer-events: none;
+    z-index: 0;
+    background: linear-gradient(0deg, var(--water-cyan-deep) 0%, transparent 100%);
+    opacity: 0.18;
+    transition: height 1.2s var(--ease-spring), opacity 0.8s ease;
+}
+
+/* Bento Card Grid Spec */
+.bento-card {
+    background: var(--bg-glass-card);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-glass);
+    position: relative;
+    overflow: hidden;
+    transition: transform var(--duration-fast) var(--ease-spring),
+                border-color var(--duration-normal) ease,
+                box-shadow var(--duration-normal) ease;
+}
+
+.bento-card:hover {
+    border-color: var(--border-glow);
+    box-shadow: var(--shadow-glass), var(--shadow-cyan-glow);
+}
+
+/* Card Light Sheen on Cursor */
+.card-sheen {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(255,255,255,0.08) 0%, transparent 60%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.bento-card:hover .card-sheen {
+    opacity: 1;
+}
+
+/* Animated Gradient Borders */
+.bento-card-hero {
+    position: relative;
+}
+.bento-card-hero::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: linear-gradient(135deg, var(--accent-cyan), transparent 40%, var(--accent-blue));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+}
+
+/* Hero Typography */
+.font-display {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+}
+
+.font-tamil {
+    font-family: var(--font-tamil);
+}
+
+/* Liquid Circular Radial Fill Gauge */
+.liquid-radial-wrap {
+    position: relative;
+    width: 140px;
+    height: 140px;
+    margin: 0 auto;
+    border-radius: 50%;
+    padding: 6px;
+    background: conic-gradient(var(--accent-cyan) var(--gauge-pct, 50%), rgba(255,255,255,0.08) 0);
+    box-shadow: 0 0 20px rgba(0, 229, 255, 0.25);
+    transition: background 0.8s var(--ease-spring);
+}
+
+.liquid-radial-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.liquid-wave-bg {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: var(--gauge-pct, 50%);
+    background: linear-gradient(180deg, var(--water-cyan-top), var(--water-cyan-deep));
+    opacity: 0.65;
+    transition: height 0.8s var(--ease-spring);
+}
+
+/* Reduced Motion Overrides */
+@media (prefers-reduced-motion: reduce) {
+    *, ::before, ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+    .ambient-water-backdrop {
+        transition: none !important;
+    }
+}

@@ -14,6 +14,9 @@ import {
     orderByKey,
     limitToLast,
     ensureDefaults,
+    SUB,
+    GLOBAL,
+    damPath,
     PATHS
 } from "./firebase.js";
 import {
@@ -24,7 +27,7 @@ import {
     setText,
     relativeTime
 } from "./utils.js";
-import { initAuth, getCurrentUser, ROLES } from "./auth.js";
+import { initAuth, getCurrentUser, getSelectedDam, onAuthChange, ROLES } from "./auth.js";
 import { setupAuthUi } from "./authUi.js";
 
 const state = {
@@ -33,6 +36,9 @@ const state = {
     telemetry: null,
     controls: null
 };
+
+let activeUnsubscribers = [];
+let activeDamId = "mettur";
 
 function currentPump() {
     return String(state.telemetry?.pumpStatus || state.controls?.pump || "OFF").toUpperCase();
@@ -52,8 +58,10 @@ function commandedGate() {
 
 async function writeLog({ command, target, previousState, newState, status = "SENT" }) {
     try {
-        await push(ref(db, PATHS.logs), {
+        const logsPath = damPath(activeDamId, SUB.logs);
+        await push(ref(db, logsPath), {
             timestamp: Date.now(),
+            damId: activeDamId,
             command,
             target,
             previousState,
@@ -79,6 +87,11 @@ function checkAdminAuthPermission() {
         showCommandSent("Action Blocked: General public view cannot send motor commands. Please sign in as Dam Supervisor or Super Admin.");
         return false;
     }
+    // Dam Supervisor can only control their assigned dam
+    if (user.role === ROLES.DAM_SUPERVISOR && user.assignedDam && user.assignedDam !== "all" && user.assignedDam !== activeDamId) {
+        showCommandSent(`Action Blocked: You are only authorized for ${user.assignedDamName || user.assignedDam}.`);
+        return false;
+    }
     return true;
 }
 
@@ -86,14 +99,15 @@ async function sendPump(next) {
     if (!checkAdminAuthPermission()) return;
     const previous = currentPump();
     try {
-        await set(ref(db, "controls/pump"), next);
+        const pumpPath = damPath(activeDamId, "controls/pump");
+        await set(ref(db, pumpPath), next);
         await writeLog({
             command: next === "ON" ? "PUMP_ON" : "PUMP_OFF",
-            target: "Inflow Pump",
+            target: `Inflow Pump (${activeDamId})`,
             previousState: previous,
             newState: next
         });
-        showCommandSent(`Command Sent: Inflow pump ${next}`);
+        showCommandSent(`Command Sent [${activeDamId}]: Inflow pump ${next}`);
     } catch (error) {
         console.error("Pump command failed:", error);
         showCommandSent("Command failed – check Firebase connection.");
@@ -104,14 +118,15 @@ async function sendSolenoid(next) {
     if (!checkAdminAuthPermission()) return;
     const previous = currentSolenoid();
     try {
-        await set(ref(db, "controls/solenoid"), next);
+        const solPath = damPath(activeDamId, "controls/solenoid");
+        await set(ref(db, solPath), next);
         await writeLog({
             command: next === "OPEN" ? "SOLENOID_OPEN" : "SOLENOID_CLOSE",
-            target: "Irrigation Solenoid",
+            target: `Irrigation Solenoid (${activeDamId})`,
             previousState: previous,
             newState: next
         });
-        showCommandSent(`Command Sent: Solenoid ${next}`);
+        showCommandSent(`Command Sent [${activeDamId}]: Solenoid ${next}`);
     } catch (error) {
         console.error("Solenoid command failed:", error);
         showCommandSent("Command failed – check Firebase connection.");
@@ -134,14 +149,15 @@ async function sendGate(command) {
         commandId
     };
     try {
-        await update(ref(db, "controls/gate"), payload);
+        const gatePath = damPath(activeDamId, "controls/gate");
+        await update(ref(db, gatePath), payload);
         await writeLog({
             command,
-            target: "Reservoir Gate",
+            target: `Reservoir Gate (${activeDamId})`,
             previousState: previous,
             newState: `${command} (id ${commandId})`
         });
-        showCommandSent(`Command Sent: Gate ${command.replaceAll("_", " ")}. Waiting for telemetry confirmation.`);
+        showCommandSent(`Command Sent [${activeDamId}]: Gate ${command.replaceAll("_", " ")}. Waiting for telemetry confirmation.`);
     } catch (error) {
         console.error("Gate command failed:", error);
         showCommandSent("Command failed – check Firebase connection.");
@@ -209,8 +225,19 @@ function bindButtons() {
     document.getElementById("gateStepClose")?.addEventListener("click", () => sendGate("STEP_CLOSE"));
 }
 
-function subscribe() {
-    onValue(ref(db, PATHS.connected), (snap) => {
+function unsubscribeAll() {
+    activeUnsubscribers.forEach((unsub) => {
+        try { unsub(); } catch (e) { /* ignore */ }
+    });
+    activeUnsubscribers = [];
+}
+
+function subscribe(damId) {
+    unsubscribeAll();
+    activeDamId = damId || getSelectedDam()?.id || "mettur";
+
+    // Global connection listener
+    const unsubConnected = onValue(ref(db, GLOBAL.connected), (snap) => {
         state.firebaseConnected = snap.val() === true;
         updateAdminUi();
     }, (error) => {
@@ -218,40 +245,56 @@ function subscribe() {
         state.firebaseConnected = false;
         updateAdminUi();
     });
+    activeUnsubscribers.push(unsubConnected);
 
-    onValue(ref(db, PATHS.device), (snap) => {
+    // Dam-namespaced listeners
+    const unsubDevice = onValue(ref(db, damPath(activeDamId, SUB.device)), (snap) => {
         state.device = snap.val();
         updateAdminUi();
     }, (error) => console.error("device listener failed:", error));
+    activeUnsubscribers.push(unsubDevice);
 
-    onValue(ref(db, PATHS.telemetryCurrent), (snap) => {
+    const unsubTelemetry = onValue(ref(db, damPath(activeDamId, SUB.telemetryCurrent)), (snap) => {
         state.telemetry = snap.val();
         updateAdminUi();
     }, (error) => console.error("telemetry/current listener failed:", error));
+    activeUnsubscribers.push(unsubTelemetry);
 
-    onValue(ref(db, PATHS.controls), (snap) => {
+    const unsubControls = onValue(ref(db, damPath(activeDamId, SUB.controls)), (snap) => {
         state.controls = snap.val();
         updateAdminUi();
     }, (error) => console.error("controls listener failed:", error));
+    activeUnsubscribers.push(unsubControls);
 
-    const logsQuery = query(ref(db, PATHS.logs), orderByKey(), limitToLast(50));
-    onValue(logsQuery, (snap) => {
+    const logsQuery = query(ref(db, damPath(activeDamId, SUB.logs)), orderByKey(), limitToLast(50));
+    const unsubLogs = onValue(logsQuery, (snap) => {
         const value = snap.val() || {};
         const entries = Object.values(value).sort((a, b) => toNumber(a.timestamp) - toNumber(b.timestamp));
         renderLogs(entries);
     }, (error) => console.error("logs listener failed:", error));
+    activeUnsubscribers.push(unsubLogs);
 }
 
 async function init() {
     await initAuth();
     setupAuthUi();
     bindButtons();
+
+    const selectedDam = getSelectedDam()?.id || "mettur";
     try {
-        await ensureDefaults();
+        await ensureDefaults(selectedDam);
     } catch (error) {
         console.error("Firebase initialization error:", error);
     }
-    subscribe();
+
+    subscribe(selectedDam);
+
+    onAuthChange((user, dam) => {
+        if (dam && dam.id !== activeDamId) {
+            subscribe(dam.id);
+        }
+    });
 }
 
 document.addEventListener("DOMContentLoaded", init);
+window.addEventListener("beforeunload", unsubscribeAll);

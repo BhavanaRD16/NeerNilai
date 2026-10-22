@@ -10,6 +10,9 @@ import {
     orderByKey,
     limitToLast,
     ensureDefaults,
+    SUB,
+    GLOBAL,
+    damPath,
     PATHS
 } from "./firebase.js";
 import {
@@ -27,8 +30,18 @@ import {
 } from "./utils.js";
 import { evaluateAlerts, renderAlerts, waterConditionLabel, publishAlertsAndOverflow } from "./alerts.js";
 import { createTelemetryCharts, updateCharts } from "./charts.js";
-import { initAuth, getSelectedDam, getCurrentUser, ROLES } from "./auth.js";
+import { initAuth, getSelectedDam, getCurrentUser, onAuthChange, ROLES } from "./auth.js";
 import { setupAuthUi } from "./authUi.js";
+import { DigitalTwin } from "./digitalTwin.js";
+import { StateMap } from "./stateMap.js";
+import { calculatePredictions } from "./predictions.js";
+import { demoDirector } from "./demoMode.js";
+import { setLanguage, applyTranslations } from "./i18n.js";
+import { themeEngine } from "./themeEngine.js";
+import { dangerScene } from "./dangerScene.js";
+import { audioEngine } from "./audioEngine.js";
+import { runCinematicIntro } from "./intro.js";
+import { initInteractions } from "./interactions.js";
 
 const HISTORY_LIMIT = 500;
 const state = {
@@ -92,6 +105,9 @@ function updateConnectionUi() {
     }
 }
 
+let digitalTwin = null;
+let stateMap = null;
+
 function updateMetrics() {
     const t = state.telemetry || {};
     setText("metricLevel", formatNumber(t.waterLevel, 1, "cm"));
@@ -101,13 +117,25 @@ function updateMetrics() {
     setText("metricOutflow", formatNumber(t.outflowRate, 1, "L/min"));
     setText("metricGate", formatPercent(toNumber(t.gatePosition, 0) * 100, 0));
 
-    const pct = clampPercent(t.waterPercentage);
-    const water = document.getElementById("tankWater");
-    const readout = document.getElementById("tankReadout");
-    if (water) water.style.height = `${pct}%`;
-    if (readout) {
-        readout.innerHTML = `<strong>${formatNumber(t.waterLevel, 1)} cm</strong><span>${formatPercent(t.waterPercentage, 0)}</span>`;
+    // Update Digital Twin
+    if (digitalTwin) {
+        const isOnline = isDeviceOnline(state.device) && state.firebaseConnected;
+        digitalTwin.update(t, state.settings, isOnline);
     }
+
+    // Ambient page-level water fill backdrop
+    themeEngine.updateAmbientWater(t.waterPercentage);
+
+    // Danger takeover scene evaluation
+    dangerScene.evaluateState(t, state.settings, state.alerts);
+
+    // Update Predictions
+    const pred = calculatePredictions(t, state.settings);
+    setText("predHeadline", pred.headline);
+    setText("predNetFlow", `${pred.netFlowLpm > 0 ? "+" : ""}${pred.netFlowLpm.toFixed(1)} L/min`);
+    setText("predRateOfRise", `${pred.rateOfRiseCmMin > 0 ? "+" : ""}${pred.rateOfRiseCmMin.toFixed(2)} cm/min`);
+    setText("predTimeToWarning", pred.timeToWarningMin !== null ? `~${Math.ceil(pred.timeToWarningMin)} min` : "SAFE");
+    setText("predTimeToCritical", pred.timeToCriticalMin !== null ? `~${Math.ceil(pred.timeToCriticalMin)} min` : "SAFE");
 }
 
 function clampPercent(value) {
@@ -135,31 +163,6 @@ function updateSettingsSummary() {
     setText("setWarning", formatNumber(s.warningLevel, 1, "cm"));
     setText("setCritical", formatNumber(s.criticalLevel, 1, "cm"));
     setText("setOverflow", s.overflowSafety === false ? "DISABLED" : "ENABLED");
-}
-
-function refreshAlerts() {
-    const user = getCurrentUser();
-    const isAuthorized = user.role !== ROLES.GENERAL;
-    const allAlerts = evaluateAlerts({
-        telemetry: state.telemetry,
-        settings: state.settings,
-        deviceOnline: isDeviceOnline(state.device) && state.firebaseConnected,
-        firebaseConnected: state.firebaseConnected
-    });
-
-    if (isAuthorized) {
-        // Authorized users see every alert including system/technical ones
-        renderAlerts(document.getElementById("alertSection"), allAlerts);
-    } else {
-        // General public: filter out system-level alerts (ESP32, Firebase, connection codes)
-        const SYSTEM_ALERT_CODES = ["ESP32_DISCONNECTED", "FIREBASE_ERROR"];
-        const publicAlerts = allAlerts.filter((a) => !SYSTEM_ALERT_CODES.includes(a.code));
-        // Render water-condition alerts in the public section only
-        renderPublicAlerts(document.getElementById("publicAlertSection"), publicAlerts);
-    }
-
-    updateStatusPanel(allAlerts);
-    publishAlertsAndOverflow(allAlerts, state.settings, state.telemetry, state.controls);
 }
 
 /**
@@ -263,8 +266,22 @@ function bindHistoryControls() {
     document.getElementById("downloadCsv")?.addEventListener("click", exportCsv);
 }
 
-function subscribe() {
-    onValue(ref(db, PATHS.connected), (snap) => {
+let activeUnsubscribers = [];
+let activeDamId = "mettur";
+
+function unsubscribeAll() {
+    activeUnsubscribers.forEach((unsub) => {
+        try { unsub(); } catch (e) { /* ignore */ }
+    });
+    activeUnsubscribers = [];
+}
+
+function subscribe(damId) {
+    unsubscribeAll();
+    activeDamId = damId || getSelectedDam()?.id || "mettur";
+
+    // Global connection listener
+    const unsubConnected = onValue(ref(db, GLOBAL.connected), (snap) => {
         state.firebaseConnected = snap.val() === true;
         updateConnectionUi();
         refreshAlerts();
@@ -274,41 +291,119 @@ function subscribe() {
         updateConnectionUi();
         refreshAlerts();
     });
+    activeUnsubscribers.push(unsubConnected);
 
-    onValue(ref(db, PATHS.device), (snap) => {
+    // Dam-namespaced listeners
+    const unsubDevice = onValue(ref(db, damPath(activeDamId, SUB.device)), (snap) => {
         state.device = snap.val();
         updateConnectionUi();
         refreshAlerts();
     }, (error) => console.error("device listener failed:", error));
+    activeUnsubscribers.push(unsubDevice);
 
-    onValue(ref(db, PATHS.telemetryCurrent), (snap) => {
+    const unsubTelemetry = onValue(ref(db, damPath(activeDamId, SUB.telemetryCurrent)), (snap) => {
         state.telemetry = snap.val();
         updateMetrics();
         updateConnectionUi();
         refreshAlerts();
     }, (error) => console.error("telemetry/current listener failed:", error));
+    activeUnsubscribers.push(unsubTelemetry);
 
-    onValue(ref(db, PATHS.settings), (snap) => {
+    const unsubSettings = onValue(ref(db, damPath(activeDamId, SUB.settings)), (snap) => {
         state.settings = snap.val();
         updateSettingsSummary();
         refreshAlerts();
     }, (error) => console.error("settings listener failed:", error));
+    activeUnsubscribers.push(unsubSettings);
 
-    onValue(ref(db, PATHS.controls), (snap) => {
+    const unsubControls = onValue(ref(db, damPath(activeDamId, SUB.controls)), (snap) => {
         state.controls = snap.val();
     }, (error) => console.error("controls listener failed:", error));
+    activeUnsubscribers.push(unsubControls);
 
-    const historyQuery = query(ref(db, PATHS.telemetryHistory), orderByKey(), limitToLast(HISTORY_LIMIT));
-    onValue(historyQuery, (snap) => {
+    const historyQuery = query(ref(db, damPath(activeDamId, SUB.telemetryHistory)), orderByKey(), limitToLast(HISTORY_LIMIT));
+    const unsubHistory = onValue(historyQuery, (snap) => {
         state.history = historyToArray(snap.val());
         if (charts) updateCharts(charts, state.history);
         renderHistoryTable();
     }, (error) => console.error("telemetry/history listener failed:", error));
+    activeUnsubscribers.push(unsubHistory);
+}
+
+function refreshAlerts() {
+    const user = getCurrentUser();
+    const isAuthorized = user.role !== ROLES.GENERAL;
+    const allAlerts = evaluateAlerts({
+        telemetry: state.telemetry,
+        settings: state.settings,
+        deviceOnline: isDeviceOnline(state.device) && state.firebaseConnected,
+        firebaseConnected: state.firebaseConnected
+    });
+
+    if (isAuthorized) {
+        // Authorized users see every alert including system/technical ones
+        renderAlerts(document.getElementById("alertSection"), allAlerts);
+    } else {
+        // General public: filter out system-level alerts (ESP32, Firebase, connection codes)
+        const SYSTEM_ALERT_CODES = ["ESP32_DISCONNECTED", "FIREBASE_ERROR"];
+        const publicAlerts = allAlerts.filter((a) => !SYSTEM_ALERT_CODES.includes(a.code));
+        // Render water-condition alerts in the public section only
+        renderPublicAlerts(document.getElementById("publicAlertSection"), publicAlerts);
+    }
+
+    updateStatusPanel(allAlerts);
+    publishAlertsAndOverflow(allAlerts, state.settings, state.telemetry, state.controls, activeDamId);
 }
 
 async function init() {
     await initAuth();
     setupAuthUi();
+
+    // Initialize Digital Twin
+    const dtContainer = document.getElementById("digitalTwinContainer");
+    if (dtContainer) {
+        digitalTwin = new DigitalTwin(dtContainer);
+    }
+
+    // Initialize Tamil Nadu State Fleet Map
+    const mapContainer = document.getElementById("stateMapContainer");
+    if (mapContainer) {
+        stateMap = new StateMap(mapContainer);
+    }
+
+    // Bind Demo Tour button
+    document.getElementById("btnStartDemo")?.addEventListener("click", () => {
+        demoDirector.start();
+    });
+
+    // Bind Language toggle buttons
+    // Bind Language toggle buttons
+    document.getElementById("btnLangEn")?.addEventListener("click", () => {
+        document.getElementById("btnLangEn")?.classList.add("active");
+        document.getElementById("btnLangTa")?.classList.remove("active");
+        setLanguage("en");
+    });
+    document.getElementById("btnLangTa")?.addEventListener("click", () => {
+        document.getElementById("btnLangTa")?.classList.add("active");
+        document.getElementById("btnLangEn")?.classList.remove("active");
+        setLanguage("ta");
+    });
+
+    // Audio soundscape toggle
+    const audioBtn = document.getElementById("btnToggleAudio");
+    audioBtn?.addEventListener("click", () => {
+        const isNowOn = audioEngine.toggleAudio();
+        audioBtn.classList.toggle("btn-teal", isNowOn);
+        audioBtn.classList.toggle("btn-outline-light", !isNowOn);
+        const label = audioBtn.querySelector(".audio-label");
+        if (label) label.textContent = isNowOn ? "Audio ON" : "Muted";
+    });
+
+    // Init micro-interactions & card tilt
+    initInteractions();
+
+    // Run first-session cinematic intro
+    runCinematicIntro();
 
     charts = createTelemetryCharts(
         document.getElementById("chartMulti"),
@@ -316,8 +411,9 @@ async function init() {
     );
     bindHistoryControls();
 
+    const selectedDam = getSelectedDam()?.id || "mettur";
     try {
-        await ensureDefaults();
+        await ensureDefaults(selectedDam);
     } catch (error) {
         console.error("Firebase initialization error:", error);
         state.firebaseConnected = false;
@@ -325,9 +421,26 @@ async function init() {
         refreshAlerts();
     }
 
-    subscribe();
+    subscribe(selectedDam);
+
+    // When user or dam changes, re-subscribe to the newly chosen dam
+    onAuthChange((user, dam) => {
+        if (dam && dam.id !== activeDamId) {
+            subscribe(dam.id);
+            if (stateMap) stateMap.render();
+        }
+    });
+
     clockTimer = setInterval(updateConnectionUi, 1000);
 }
 
-document.addEventListener("DOMContentLoaded", init);
-window.addEventListener("beforeunload", () => clearInterval(clockTimer));
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+} else {
+    init();
+}
+
+window.addEventListener("beforeunload", () => {
+    clearInterval(clockTimer);
+    unsubscribeAll();
+});

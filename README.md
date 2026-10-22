@@ -1,103 +1,123 @@
-# NeerNilai
+# NeerNilai (நீர்நிலை) v2 — Smart Reservoir Monitoring & Digital Twin System
 
-Smart Reservoir Monitoring and Control System for Tamil Nadu Dams.
+> **A software-defined hardware prototype & smart monitoring system for Tamil Nadu dams.**
 
-This version is a static web dashboard (HTML, CSS, vanilla JavaScript, Bootstrap 5, Chart.js) connected to **Firebase Realtime Database**. An on-site ESP32 is not required yet: `simulator.html` writes realistic telemetry to the same database paths the hardware will use later.
+NeerNilai combines a **truthful interactive SVG digital twin**, an **autonomous firmware-brain simulator**, and a **real-time supervisory dashboard** connected to Firebase Realtime Database. It monitors telemetry from 7 major Tamil Nadu reservoirs (Mettur, Vaigai, Bhavanisagar, Mullaperiyar, Pechiparai, Aliyar, Sathanur) at prototype scale (`cm`, `L`, `L/min`) with live conversion to real-dam units (`ft`, `TMC`, `cusecs`).
 
-## How to run
+---
 
-1. Open the project folder in VS Code.
-2. Install the **Live Server** extension if you do not have it.
-3. Right-click `index.html` → **Open with Live Server**.
-4. Keep a second tab on `simulator.html`, click **START SIMULATOR**, then return to the dashboard. Metrics, tank, charts, and alerts update without a page refresh.
+## 🏗️ System Architecture
 
-You can also open the HTML files directly, but Live Server is more reliable with ES modules.
+```mermaid
+graph TD
+    subgraph Hardware_Rig [Software-Defined Hardware Prototype]
+        ESP32[ESP32 Firmware Brain]
+        HCSR04[Ultrasonic Level Sensor]
+        Pump[12V Inflow Pump]
+        Stepper[Stepper Motor + Gear Train]
+        SluiceGate[Spillway Sluice Gate]
+        Solenoid[Solenoid Irrigation Valve]
+        YFS201[Pulse Flow Sensors]
+    end
 
-## Firebase setup
+    subgraph Cloud_Layer [Firebase Realtime Database]
+        RTDB[Firebase RTDB /dams/{damId}/...]
+        Rules[database.rules.json]
+    end
 
-The web app already uses this project:
+    subgraph Client_Applications [Supervisory & Public Web App]
+        Twin[SVG Digital Twin Model]
+        Dashboard[Real-Time Analytics Dashboard]
+        Admin[Administrative Motor HMI]
+        Scenarios[Scenario Director Engine]
+        Map[Tamil Nadu Water Grid Map]
+        Tour[Automated Demo Director]
+    end
 
-- Project name: **NeerNilai**
-- Project ID: **neernilai**
-- Database URL: `https://neernilai-default-rtdb.firebaseio.com`
-
-Configuration lives only in `js/firebase.js`.
-
-In the [Firebase console](https://console.firebase.google.com/):
-
-1. Enable **Realtime Database**.
-2. For development, use open rules (see below). Lock them down before any public deployment.
-3. Do not enable Authentication for this college demo unless you add it later.
-
-On first load, the app seeds:
-
-- `settings/` — tank height 15 cm, capacity 50 L, warning 12 cm, critical 13.5 cm, overflow safety on
-- `controls/` — pump OFF, solenoid CLOSED, gate STOP
-- `device/` — `ESP32_RESERVOIR_01`
-
-## Start the simulator
-
-1. Open `simulator.html`.
-2. Choose 1 / 2 / 5 / 10 second interval.
-3. Click **START SIMULATOR**.
-4. Leave that tab open while you use Dashboard and Admin Control.
-5. Click **STOP SIMULATOR** when finished (marks the device offline). Closing the tab also tries to set `device/online` to `false`.
-
-The simulator reads `controls/` (admin + overflow-safety commands) and writes `telemetry/current`, `telemetry/history/{timestamp}`, and `device/`.
-
-## Verify data in Firebase
-
-Console → Realtime Database → Data:
-
-- `telemetry/current` should change every interval.
-- `telemetry/history` should grow with timestamp keys.
-- `device/online` should be `true` while the simulator runs.
-- Admin buttons should change `controls/` and append `logs/`.
-- Overflow at ≥ 80% of max height writes `controls/gate/command = OPEN_FULL`.
-
-## How the dashboard connects
-
-Pages load ES modules. `js/firebase.js` initializes the modular SDK once. `dashboard.js` attaches `onValue()` listeners to `.info/connected`, `device`, `telemetry/current`, `telemetry/history`, `settings`, and `controls`. Charts and the history table follow `telemetry/history` (last 500 samples). Alerts are computed from telemetry + settings and stored under `alerts/`.
-
-## Development database rules
-
-Realtime Database → Rules (development only):
-
-```json
-{
-  "rules": {
-    ".read": true,
-    ".write": true
-  }
-}
+    ESP32 -->|Autonomous Safety Logic| SluiceGate
+    ESP32 -->|Telemetry Stream| RTDB
+    RTDB -->|Live Listeners| Dashboard
+    RTDB -->|Real-Time State| Twin
+    RTDB -->|Fleet Status| Map
+    Admin -->|Motor / Gate Commands| RTDB
+    RTDB -->|Command Dispatch| ESP32
+    Tour -->|Hazard Scenarios| Scenarios
+    Scenarios -->|Physics Overrides| ESP32
 ```
 
-These rules allow any visitor to read and write the database. Use them only for a private demo. For production, restrict write access to the ESP32 and authenticated operators.
+---
 
-## Features implemented now
+## ✨ Key Features & Upgrades
 
-- Monitoring dashboard with live ESP32 / Firebase status
-- Dynamic alerts (normal, low, warning, critical, overflow, disconnect, high inflow/outflow)
-- Metric cards and CSS reservoir visualization
-- Chart.js water level / inflow / outflow and storage charts
-- History table, time filters, CSV export
-- Settings summary from `settings/`
-- Admin pump, solenoid, and gate commands (`Command Sent` vs telemetry-confirmed position)
-- Administrative command log in `logs/`
-- Software overflow safety (gate-open **command**, not a claimed physical move)
-- ESP32 telemetry simulator with coupled pump / gate / level physics
-- Responsive Bootstrap layout
+1. **Live SVG Digital Twin**:
+   - Interactive, realistic visual twin mirroring the physical prototype rig (acrylic tank, ultrasonic sonar pulses, spinning pump impeller, gear-train rotation, translating sluice gate blade, turbulent cascade spray, and solenoid status indicator).
+   - Driven synchronously by Firebase telemetry with `prefers-reduced-motion` compliance.
 
-## Later, with ESP32 hardware
+2. **Firmware-Brain Simulator & Scenario Director**:
+   - Emulates autonomous on-chip ESP32 firmware logic: if water touches **80% (12 cm)**, the device-side firmware overrides commands, auto-opens the spillway sluice gate to 100%, and cuts power to the intake pump, even when the browser dashboard is closed.
+   - **7 Physical Hazard Scenarios**: `Monsoon Surge`, `Drought`, `Pump Failure`, `Sluice Gate Jam`, `Ultrasonic Sensor Fault`, `Wi-Fi Telemetry Drop`, and `Flash Flood`.
+   - **Speed Multiplier**: Accelerate simulation clock by 1x, 5x, 20x, or 60x.
 
-- Arduino / ESP32 firmware (not in this repo yet)
-- JSN-SR04T ultrasonic level sensing
-- Water flow sensors for inflow / outflow
-- DC pump motor, solenoid valve, servo/stepper gate
-- Replace `simulator.html` with the device; keep the same Firebase schema
-- Tighter database rules and optional operator login
-- Field calibration of tank height and storage curve
+3. **Multi-Dam Namespacing (7 Tamil Nadu Dams)**:
+   - All data is isolated under `/dams/{damId}/...` (`mettur`, `vaigai`, `bhavanisagar`, `periyar`, `pechiparai`, `aliyar`, `sathanur`).
+   - Interactive Tamil Nadu state map with live health markers.
+   - Backward-compatible migration helper for legacy flat structures.
 
-Architecture when hardware is ready:
+4. **Predictive Analytics & Water Balance**:
+   - Calculates net inflow rate ($Q_{in} - Q_{out}$) and projects accurate time-to-warning and time-to-critical overflow.
 
-Sensors → ESP32 → Wi-Fi → Firebase Realtime Database → NeerNilai Dashboard
+5. **Security & Role-Based Access Control**:
+   - Passwords stored as **salted SHA-256 hashes** via the Web Crypto API (`crypto.subtle`).
+   - Three operational roles:
+     - `SUPER_ADMIN`: Statewide access, dam supervisor assignment, full actuator control.
+     - `DAM_SUPERVISOR`: Delegated control of assigned reservoir.
+     - `GENERAL`: Public read-only safety view with simplified non-technical language.
+
+6. **Bilingual Support (English & தமிழ்)**:
+   - One-click instant UI toggle between English and Tamil.
+
+7. **One-Click Automated Demo Tour**:
+   - Automated unattended tour for college project reviews exercising normal ops, monsoon surge, predictive alerts, spillway auto-dispatch, and safe drainage.
+
+---
+
+## 🚀 Quick Start Guide
+
+### 1. Run Locally
+1. Clone or open the project folder in VS Code.
+2. Launch with **Live Server** (Right-click `index.html` → *Open with Live Server*).
+3. Open `simulator.html` in a second tab and click **START FIRMWARE ENGINE**.
+4. Return to `index.html` — watch the live Digital Twin, telemetry gauges, and charts update in real time!
+
+### 2. Demo Tour for Reviewers
+- On the dashboard header, click **Demo Tour**.
+- The system will automatically step through 5 guided operational phases with step-by-step explanatory banners.
+
+---
+
+## 🗄️ Database Paths
+
+| Path | Purpose |
+|------|---------|
+| `/dams/{damId}/device` | Device state (`online`, `id`, `lastSeen`, `firmwareSafety`) |
+| `/dams/{damId}/telemetry/current` | Latest water level, percentage, storage, flows, gate pos |
+| `/dams/{damId}/telemetry/history/{ts}` | Historical time-series telemetry |
+| `/dams/{damId}/controls` | Motor commands (`pump`, `solenoid`, `gate`) |
+| `/dams/{damId}/settings` | Configured thresholds (`maxTankHeight`, `warningLevel`, `criticalLevel`) |
+| `/dams/{damId}/alerts` | Active alert list with severity rankings |
+| `/dams/{damId}/logs` | Audit trail of administrative and firmware actions |
+| `/users` | Salted SHA-256 user credentials and role assignments |
+| `/meta` | System migration flags and global metadata |
+
+---
+
+## 🛡️ Default Demo Credentials
+
+| Role | Username | Demo Password | Dam Assignment |
+|------|----------|---------------|----------------|
+| **Super Admin** | `admin` | `admin123` | Statewide (All) |
+| **Dam Supervisor** | `supervisor_mettur` | `mettur123` | Mettur Dam |
+| **Dam Supervisor** | `supervisor_vaigai` | `vaigai123` | Vaigai Dam |
+| **General Public** | *No login needed* | *N/A* | Public Safety View |
+
+*Note: Plaintext passwords are automatically migrated to salted SHA-256 hashes on first load.*

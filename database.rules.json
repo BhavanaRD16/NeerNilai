@@ -1,0 +1,35 @@
+{
+  "rules": {
+    "dams": {
+      "$damId": {
+        ".read": true,
+        "controls": {
+          ".write": "auth != null || newData.exists()"
+        },
+        "settings": {
+          ".write": "auth != null || newData.exists()"
+        },
+        "telemetry": {
+          ".write": true
+        },
+        "device": {
+          ".write": true
+        },
+        "alerts": {
+          ".write": true
+        },
+        "logs": {
+          ".write": true
+        }
+      }
+    },
+    "users": {
+      ".read": true,
+      ".write": true
+    },
+    "meta": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NeerNilai | ESP32 Telemetry Simulator</title>
+    <title>NeerNilai | ESP32 Telemetry Simulator &amp; Scenario Director</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -25,6 +25,7 @@
                 </a>
                 <p class="tagline mb-0 d-none d-lg-block">Real-Time ESP32 Monitoring &amp; Administrative Control</p>
                 <nav class="d-flex flex-wrap gap-1 align-items-center" aria-label="Main">
+                    <a class="nav-link" href="index.html">Dashboard</a>
                     <a class="nav-link" href="admin.html">Admin Control</a>
                     <a class="nav-link active" href="simulator.html">Simulator</a>
                     <!-- Auth bar injected here by authUi.js -->
@@ -39,56 +40,145 @@
     </header>
 
     <main class="container page-wrap">
-        <div class="mb-3">
-            <h1 class="hmi-title h3 mb-1">ESP32 Reservoir Telemetry Simulator</h1>
-            <p class="text-muted mb-0">This page stands in for the future ESP32. It writes live data to Firebase Realtime Database using the same schema the hardware will use.</p>
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+            <div>
+                <h1 class="hmi-title h3 mb-1">ESP32 Firmware-Brain Simulator &amp; Scenario Director</h1>
+                <p class="text-muted mb-0">Software-defined hardware prototype: emulates ESP32 micro-controller, autonomous emergency spillway logic, sensor noise, and catastrophic stress scenarios.</p>
+            </div>
+            <div>
+                <button id="btnSeedHistory" class="btn btn-outline-info btn-sm btn-nn">
+                    <i class="bi bi-database-fill-add me-1"></i> Pre-Seed 24h History
+                </button>
+            </div>
         </div>
 
         <div class="row g-3">
             <div class="col-lg-5">
-                <section class="glass-card">
-                    <div class="section-label"><i class="bi bi-cpu"></i> Simulator Controls</div>
+                <section class="glass-card mb-3">
+                    <div class="section-label"><i class="bi bi-cpu"></i> Simulator Engine Controls</div>
                     <div class="mb-3">
-                        <div class="metric-name">Device ID</div>
+                        <div class="metric-name">Device ID (Hardware Target)</div>
                         <div id="simDevice" class="fw-semibold">ESP32_RESERVOIR_01</div>
                     </div>
                     <div class="d-flex justify-content-between mb-3">
                         <div>
-                            <div class="metric-name">Connection status</div>
+                            <div class="metric-name">Firmware state</div>
                             <div id="simRunState" class="status-pill pill-off">STOPPED</div>
                         </div>
                         <div class="text-end">
-                            <div class="metric-name">Simulation interval</div>
-                            <div id="simIntervalLabel">2 s</div>
+                            <div class="metric-name">Sampling interval</div>
+                            <div id="simIntervalLabel">1 s</div>
                         </div>
                     </div>
-                    <label class="small text-muted" for="simInterval">Interval</label>
-                    <select id="simInterval" class="step-select d-block mb-3 w-100">
-                        <option value="1000">1 second</option>
-                        <option value="2000" selected>2 seconds</option>
-                        <option value="5000">5 seconds</option>
-                        <option value="10000">10 seconds</option>
-                    </select>
-                    <div class="control-actions">
-                        <button id="startSim" class="btn btn-teal btn-nn">START SIMULATOR</button>
-                        <button id="stopSim" class="btn btn-danger-nn btn-nn">STOP SIMULATOR</button>
+
+                    <div class="mb-3">
+                        <label class="small text-muted mb-1 d-block">Time Acceleration Multiplier</label>
+                        <div class="btn-group w-100" role="group">
+                            <button type="button" class="btn btn-navy btn-sm active" data-sim-speed="1">1x (Real)</button>
+                            <button type="button" class="btn btn-navy btn-sm" data-sim-speed="5">5x Fast</button>
+                            <button type="button" class="btn btn-navy btn-sm" data-sim-speed="20">20x Rapid</button>
+                            <button type="button" class="btn btn-navy btn-sm" data-sim-speed="60">60x Blitz</button>
+                        </div>
                     </div>
-                    <p class="small text-muted mt-3 mb-0">Last Firebase write: <span id="simLastWrite">—</span></p>
+
+                    <label class="small text-muted" for="simInterval">Telemetry Broadcast Interval</label>
+                    <select id="simInterval" class="step-select d-block mb-3 w-100">
+                        <option value="500">0.5 second (High freq)</option>
+                        <option value="1000" selected>1.0 second (Standard)</option>
+                        <option value="2000">2.0 seconds</option>
+                        <option value="5000">5.0 seconds (Low bandwidth)</option>
+                    </select>
+
+                    <div class="control-actions">
+                        <button id="startSim" class="btn btn-teal btn-nn">START FIRMWARE ENGINE</button>
+                        <button id="stopSim" class="btn btn-danger-nn btn-nn">STOP ENGINE</button>
+                    </div>
+                    <p class="small text-muted mt-3 mb-0">Last Cloud Write: <span id="simLastWrite">—</span></p>
                     <p id="simError" class="text-danger small mt-2 mb-0"></p>
                 </section>
+
+                <section class="glass-card">
+                    <div class="section-label"><i class="bi bi-shield-shaded"></i> Autonomous Safety Brain</div>
+                    <p class="small text-muted mb-2">The ESP32 runs autonomous emergency code on-chip: if water exceeds 80% (12 cm), it overrides commands, auto-opens the sluice gate to 100%, and cuts power to the intake pump even when the browser dashboard is closed.</p>
+                    <div class="d-flex justify-content-between align-items-center p-2 rounded bg-dark-subtle">
+                        <span class="small">On-Chip Spillway Logic:</span>
+                        <span class="badge bg-success">ACTIVE &amp; AUTONOMOUS</span>
+                    </div>
+                </section>
             </div>
+
             <div class="col-lg-7">
+                <section class="glass-card mb-3">
+                    <div class="section-label"><i class="bi bi-film"></i> Scenario Director (Physical Fault &amp; Hazard Injection)</div>
+                    <p class="small text-muted mb-2">Select a physical scenario to inject real-world hazards for reviewer demonstrations:</p>
+                    <div class="row g-2 mb-3">
+                        <div class="col-sm-6">
+                            <button class="btn btn-navy w-100 text-start btn-sm p-2 active" data-scenario="NORMAL">
+                                <i class="bi bi-check-circle text-teal me-1"></i> <strong>Standard Operation</strong>
+                                <div class="text-muted small">Nominal diurnal inflow &amp; outflow</div>
+                            </button>
+                        </div>
+                        <div class="col-sm-6">
+                            <button class="btn btn-navy w-100 text-start btn-sm p-2" data-scenario="MONSOON_SURGE">
+                                <i class="bi bi-cloud-rain-heavy-fill text-warning me-1"></i> <strong>Monsoon Surge</strong>
+                                <div class="text-muted small">Massive inflow spike (12.5 L/min)</div>
+                            </button>
+                        </div>
+                        <div class="col-sm-6">
+                            <button class="btn btn-navy w-100 text-start btn-sm p-2" data-scenario="DROUGHT">
+                                <i class="bi bi-sun-fill text-warning me-1"></i> <strong>Drought Condition</strong>
+                                <div class="text-muted small">Inflow &lt; 0.1 L/min, depletion</div>
+                            </button>
+                        </div>
+                        <div class="col-sm-6">
+                            <button class="btn btn-navy w-100 text-start btn-sm p-2" data-scenario="PUMP_FAILURE">
+                                <i class="bi bi-exclamation-octagon-fill text-danger me-1"></i> <strong>Pump Hardware Stall</strong>
+                                <div class="text-muted small">Pump commanded ON but flow=0</div>
+                            </button>
+                        </div>
+                        <div class="col-sm-6">
+                            <button class="btn btn-navy w-100 text-start btn-sm p-2" data-scenario="GATE_JAM">
+                                <i class="bi bi-gear-wide-connected text-danger me-1"></i> <strong>Sluice Gate Mechanical Jam</strong>
+                                <div class="text-muted small">Gate mechanically bound at 15%</div>
+                            </button>
+                        </div>
+                        <div class="col-sm-6">
+                            <button class="btn btn-navy w-100 text-start btn-sm p-2" data-scenario="SENSOR_FAULT">
+                                <i class="bi bi-reception-1 text-warning me-1"></i> <strong>Ultrasonic Jitter/Dropout</strong>
+                                <div class="text-muted small">Acoustic echo loss &amp; NaN drops</div>
+                            </button>
+                        </div>
+                        <div class="col-sm-6">
+                            <button class="btn btn-navy w-100 text-start btn-sm p-2" data-scenario="WIFI_DROP">
+                                <i class="bi bi-wifi-off text-danger me-1"></i> <strong>Telemetry Link Drop</strong>
+                                <div class="text-muted small">Cloud blackout; local ESP runs</div>
+                            </button>
+                        </div>
+                        <div class="col-sm-6">
+                            <button class="btn btn-navy w-100 text-start btn-sm p-2" data-scenario="FLASH_FLOOD">
+                                <i class="bi bi-tsunami text-danger me-1"></i> <strong>Catastrophic Flash Flood</strong>
+                                <div class="text-muted small">Extreme emergency auto-dispatch</div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="p-2 rounded bg-dark-subtle d-flex justify-content-between align-items-center">
+                        <span class="small">Active Scenario:</span>
+                        <strong id="activeScenarioName" class="text-teal">Standard Operation (0s)</strong>
+                    </div>
+                </section>
+
                 <section class="glass-card sim-preview">
-                    <div class="section-label"><i class="bi bi-activity"></i> Live Simulated Telemetry</div>
+                    <div class="section-label"><i class="bi bi-activity"></i> Live Simulated Telemetry Stream</div>
                     <div class="kv"><span>Water level</span><strong id="prevLevel">—</strong></div>
                     <div class="kv"><span>Water percentage</span><strong id="prevPercent">—</strong></div>
                     <div class="kv"><span>Storage</span><strong id="prevStorage">—</strong></div>
-                    <div class="kv"><span>Inflow</span><strong id="prevInflow">—</strong></div>
-                    <div class="kv"><span>Outflow</span><strong id="prevOutflow">—</strong></div>
+                    <div class="kv"><span>Inflow rate</span><strong id="prevInflow">—</strong></div>
+                    <div class="kv"><span>Outflow rate</span><strong id="prevOutflow">—</strong></div>
                     <div class="kv"><span>Gate position</span><strong id="prevGate">—</strong></div>
-                    <div class="kv"><span>Pump</span><strong id="prevPump">—</strong></div>
-                    <div class="kv"><span>Solenoid</span><strong id="prevSolenoid">—</strong></div>
-                    <p class="small text-muted mt-3 mb-0">Physics follow admin commands: pump raises inflow, gate/solenoid raise outflow, and water level integrates the net flow.</p>
+                    <div class="kv"><span>Pump status</span><strong id="prevPump">—</strong></div>
+                    <div class="kv"><span>Solenoid valve</span><strong id="prevSolenoid">—</strong></div>
+                    <p class="small text-muted mt-3 mb-0">Hardware scale: prototype level in cm, capacity in L, flows in L/min. Toggle real dam equivalent units on dashboard anytime.</p>
                 </section>
             </div>
         </div>
